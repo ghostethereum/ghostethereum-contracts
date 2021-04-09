@@ -2,6 +2,6 @@ const Migrations = artifacts.require("SubscriptionContract");
 
 module.exports = function (deployer) {
   deployer.deploy(Migrations, {
-    from: "0xB04E5c6a6A0d509C558E8dBFE8BB117C770260D9",
+    from: "0x4528Ea6B59a447F9d0EaCf7F14Cde9e3388429aA",
   });
 };
