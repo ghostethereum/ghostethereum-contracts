@@ -42,11 +42,13 @@ contract SubscriptionContract {
   );
 
   event SettlementSuccess(
-    bytes id
+    bytes id,
+    uint value
   );
 
   event SettlementFailure(
-    bytes id
+    bytes id,
+    uint value
   );
 
   event SubscriptionRemoved(
@@ -227,10 +229,10 @@ contract SubscriptionContract {
 
     if (result) {
       subscription.lastSettlementTime = subscription.lastSettlementTime + (allowedPayments * subscription.interval);
-      emit SettlementSuccess(subscriptionID);
+      emit SettlementSuccess(subscriptionID, allowedPayments * subscription.value);
       return true;
     } else {
-      emit SettlementFailure(subscriptionID);
+      emit SettlementFailure(subscriptionID, allowedPayments * subscription.value);
       return false;
     }
   }
