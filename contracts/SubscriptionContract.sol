@@ -9,6 +9,7 @@ contract SubscriptionContract {
 
   struct Subscription {
     bytes id; // bytes concatenation of addresses of owner, subscriber, and token
+    bytes uuid;
     address ownerAddress;
     address subscriberAddress;
     address tokenAddress; // subscription denominated token
@@ -37,22 +38,26 @@ contract SubscriptionContract {
 
   event SubscriptionAdded(
     bytes id,
+    bytes uuid,
     uint value,
     uint interval
   );
 
   event SettlementSuccess(
     bytes id,
+    bytes uuid,
     uint value
   );
 
   event SettlementFailure(
     bytes id,
+    bytes uuid,
     uint value
   );
 
   event SubscriptionRemoved(
-    bytes id
+    bytes id,
+    bytes uuid
   );
 
   mapping (address => Owner) public owners;
@@ -92,11 +97,11 @@ contract SubscriptionContract {
     address subscriberAddress,
     address tokenAddress
   ) pure external returns (bytes memory) {
-    bytes memory result = new bytes(96);
+    bytes memory result = new bytes(60);
     assembly {
-      mstore(add(result, 32), ownerAddress)
-      mstore(add(result, 64), subscriberAddress)
-      mstore(add(result, 96), tokenAddress)
+      mstore(add(result, 20), ownerAddress)
+      mstore(add(result, 40), subscriberAddress)
+      mstore(add(result, 60), tokenAddress)
     }
     return result;
   }
@@ -106,6 +111,7 @@ contract SubscriptionContract {
     address tokenAddress,
     uint value,
     uint interval,
+    bytes calldata uuid,
     bool skipFirstPayment
   ) public notHalt returns (Subscription memory) {
     address subscriberAddress = msg.sender;
@@ -115,6 +121,7 @@ contract SubscriptionContract {
     require(subscriptions[subscriptionID].exists != true);
     require(value > 0);
     require(interval > 0);
+    require(uuid.length > 1);
 
     if (skipFirstPayment != true) {
       IERC20 erc20 = IERC20(tokenAddress);
@@ -151,6 +158,7 @@ contract SubscriptionContract {
 
     Subscription memory subscription = Subscription({
       id: subscriptionID,
+      uuid: uuid,
       ownerAddress: ownerAddress,
       subscriberAddress: subscriberAddress,
       tokenAddress: tokenAddress,
@@ -165,7 +173,7 @@ contract SubscriptionContract {
 
     subscriptions[subscriptionID] = subscription;
 
-    emit SubscriptionAdded(subscriptionID, value, interval);
+    emit SubscriptionAdded(subscriptionID, uuid, value, interval);
     return subscription;
   }
 
@@ -205,7 +213,7 @@ contract SubscriptionContract {
     owner.subscriptionIDs.pop();
     subscriber.subscriptionIDs.pop();
 
-    emit SubscriptionRemoved(subscriptionID);
+    emit SubscriptionRemoved(subscriptionID, deletedSubscription.uuid);
 
     return true;
   }
@@ -219,7 +227,9 @@ contract SubscriptionContract {
 
     uint allowedPayments = gap / subscription.interval;
 
-    require(allowedPayments >= 1);
+    if (allowedPayments < 1) {
+      return false;
+    }
 
     bool result = IERC20(subscription.tokenAddress).transferFrom(
       subscription.subscriberAddress,
@@ -229,10 +239,10 @@ contract SubscriptionContract {
 
     if (result) {
       subscription.lastSettlementTime = subscription.lastSettlementTime + (allowedPayments * subscription.interval);
-      emit SettlementSuccess(subscriptionID, allowedPayments * subscription.value);
+      emit SettlementSuccess(subscriptionID, subscription.uuid, allowedPayments * subscription.value);
       return true;
     } else {
-      emit SettlementFailure(subscriptionID, allowedPayments * subscription.value);
+      emit SettlementFailure(subscriptionID, subscription.uuid, allowedPayments * subscription.value);
       return false;
     }
   }
