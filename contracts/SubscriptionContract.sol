@@ -39,6 +39,9 @@ contract SubscriptionContract {
   event SubscriptionAdded(
     bytes id,
     bytes uuid,
+    address ownerAddress,
+    address subscriberAddress,
+    address tokenAddress,
     uint value,
     uint interval
   );
@@ -46,18 +49,27 @@ contract SubscriptionContract {
   event SettlementSuccess(
     bytes id,
     bytes uuid,
+    address ownerAddress,
+    address subscriberAddress,
+    address tokenAddress,
     uint value
   );
 
   event SettlementFailure(
     bytes id,
     bytes uuid,
+    address ownerAddress,
+    address subscriberAddress,
+    address tokenAddress,
     uint value
   );
 
   event SubscriptionRemoved(
     bytes id,
-    bytes uuid
+    bytes uuid,
+    address ownerAddress,
+    address subscriberAddress,
+    address tokenAddress
   );
 
   mapping (address => Owner) public owners;
@@ -93,15 +105,13 @@ contract SubscriptionContract {
   }
 
   function makeID(
-    address ownerAddress,
-    address subscriberAddress,
-    address tokenAddress
+    bytes memory uuid,
+    address subscriberAddress
   ) pure external returns (bytes memory) {
-    bytes memory result = new bytes(60);
+    bytes memory result = new bytes(52);
     assembly {
-      mstore(add(result, 20), ownerAddress)
-      mstore(add(result, 40), subscriberAddress)
-      mstore(add(result, 60), tokenAddress)
+      mstore(add(result, 32), uuid)
+      mstore(add(result, 52), subscriberAddress)
     }
     return result;
   }
@@ -111,11 +121,10 @@ contract SubscriptionContract {
     address tokenAddress,
     uint value,
     uint interval,
-    bytes calldata uuid,
-    bool skipFirstPayment
+    bytes calldata uuid
   ) public notHalt returns (Subscription memory) {
     address subscriberAddress = msg.sender;
-    bytes memory subscriptionID = this.makeID(ownerAddress, subscriberAddress, tokenAddress);
+    bytes memory subscriptionID = this.makeID(uuid, tokenAddress);
 
     // Assert that subscription does not exist
     require(subscriptions[subscriptionID].exists != true);
@@ -123,10 +132,8 @@ contract SubscriptionContract {
     require(interval > 0);
     require(uuid.length > 1);
 
-    if (skipFirstPayment != true) {
-      IERC20 erc20 = IERC20(tokenAddress);
-      require(erc20.transferFrom(subscriberAddress, ownerAddress, value));
-    }
+    IERC20 erc20 = IERC20(tokenAddress);
+    require(erc20.transferFrom(subscriberAddress, ownerAddress, value));
 
     if (owners[ownerAddress].exists == true) {
       owners[ownerAddress].subscriptionIDs.push(subscriptionID);
@@ -173,7 +180,15 @@ contract SubscriptionContract {
 
     subscriptions[subscriptionID] = subscription;
 
-    emit SubscriptionAdded(subscriptionID, uuid, value, interval);
+    emit SubscriptionAdded(
+      subscriptionID,
+      uuid,
+      ownerAddress,
+      subscriberAddress,
+      tokenAddress,
+      value,
+      interval
+    );
     return subscription;
   }
 
@@ -213,7 +228,13 @@ contract SubscriptionContract {
     owner.subscriptionIDs.pop();
     subscriber.subscriptionIDs.pop();
 
-    emit SubscriptionRemoved(subscriptionID, deletedSubscription.uuid);
+    emit SubscriptionRemoved(
+      subscriptionID,
+      deletedSubscription.uuid,
+      deletedSubscription.ownerAddress,
+      deletedSubscription.subscriberAddress,
+      deletedSubscription.tokenAddress
+    );
 
     return true;
   }
@@ -239,10 +260,24 @@ contract SubscriptionContract {
 
     if (result) {
       subscription.lastSettlementTime = subscription.lastSettlementTime + (allowedPayments * subscription.interval);
-      emit SettlementSuccess(subscriptionID, subscription.uuid, allowedPayments * subscription.value);
+      emit SettlementSuccess(
+        subscriptionID,
+        subscription.uuid,
+        subscription.ownerAddress,
+        subscription.subscriberAddress,
+        subscription.tokenAddress,
+        allowedPayments * subscription.value
+      );
       return true;
     } else {
-      emit SettlementFailure(subscriptionID, subscription.uuid, allowedPayments * subscription.value);
+      emit SettlementFailure(
+        subscriptionID,
+        subscription.uuid,
+        subscription.ownerAddress,
+        subscription.subscriberAddress,
+        subscription.tokenAddress,
+        allowedPayments * subscription.value
+      );
       return false;
     }
   }
