@@ -105,15 +105,10 @@ contract SubscriptionContract {
   }
 
   function makeID(
-    bytes memory uuid,
+    bytes calldata uuid,
     address subscriberAddress
   ) pure external returns (bytes memory) {
-    bytes memory result = new bytes(52);
-    assembly {
-      mstore(add(result, 32), uuid)
-      mstore(add(result, 52), subscriberAddress)
-    }
-    return result;
+    return abi.encodePacked(uuid, subscriberAddress);
   }
 
   function addSubscription(
@@ -124,7 +119,7 @@ contract SubscriptionContract {
     bytes calldata uuid
   ) public notHalt returns (Subscription memory) {
     address subscriberAddress = msg.sender;
-    bytes memory subscriptionID = this.makeID(uuid, tokenAddress);
+    bytes memory subscriptionID = this.makeID(uuid, subscriberAddress);
 
     // Assert that subscription does not exist
     require(subscriptions[subscriptionID].exists != true);
