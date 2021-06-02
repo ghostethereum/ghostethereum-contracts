@@ -289,6 +289,23 @@ contract SubscriptionContract {
     return true;
   }
 
+  function getClaimableAmount(address ownerAddress, address tokenAddress) public view returns (uint) {
+    Owner memory owner = owners[ownerAddress];
+
+    require(owner.exists);
+
+    uint answer = 0;
+
+    for (uint i = 0; i < owner.subscriptionIDs.length; i++) {
+      Subscription memory subscription = subscriptions[owner.subscriptionIDs[i]];
+      if (subscription.tokenAddress == tokenAddress) {
+        answer = answer + this.getAmountOwed(owner.subscriptionIDs[i]);
+      }
+    }
+
+    return answer;
+  }
+
   function getAmountOwed(bytes calldata subscriptionID) public view returns (uint) {
     Subscription memory subscription = subscriptions[subscriptionID];
 
