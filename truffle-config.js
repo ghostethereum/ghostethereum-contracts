@@ -59,6 +59,7 @@ module.exports = {
     rinkeby: {
       provider: function() {
         return new HDWalletProvider(
+            // throw-away seed for dev
             'this shield mass piece insane unhappy crouch answer plunge depend scare digital',
             `https://rinkeby.infura.io/v3/c541e55ce2ca4898b17d4deae83289cc`
         );
