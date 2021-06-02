@@ -194,7 +194,7 @@ contract SubscriptionContract {
 
     Subscription memory deletedSubscription = subscriptions[subscriptionID];
 
-    require(subscriberAddress == deletedSubscription.subscriberAddress);
+    require(subscriberAddress == deletedSubscription.subscriberAddress || msg.sender == deletedSubscription.ownerAddress);
 
     if (deletedSubscription.index != subscriptionIndices.length - 1) {
       bytes memory lastSubscriptionID = subscriptionIndices[subscriberIndices.length - 1];
@@ -247,11 +247,14 @@ contract SubscriptionContract {
       return false;
     }
 
-    bool result = IERC20(subscription.tokenAddress).transferFrom(
-      subscription.subscriberAddress,
-      subscription.ownerAddress,
-      allowedPayments * subscription.value
-    );
+    bool result = false;
+
+    try IERC20(subscription.tokenAddress).transferFrom(subscription.subscriberAddress, subscription.ownerAddress,allowedPayments * subscription.value) returns (bool b) {
+      result = b;
+    } catch {
+      result = false;
+    }
+
 
     if (result) {
       subscription.lastSettlementTime = subscription.lastSettlementTime + (allowedPayments * subscription.interval);
@@ -265,6 +268,7 @@ contract SubscriptionContract {
       );
       return true;
     } else {
+      this.removeSubscription(subscriptionID);
       emit SettlementFailure(
         subscriptionID,
         subscription.uuid,
