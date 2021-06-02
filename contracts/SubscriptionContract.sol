@@ -194,7 +194,50 @@ contract SubscriptionContract {
 
     Subscription memory deletedSubscription = subscriptions[subscriptionID];
 
-    require(subscriberAddress == deletedSubscription.subscriberAddress || msg.sender == deletedSubscription.ownerAddress);
+    require(subscriberAddress == deletedSubscription.subscriberAddress);
+
+    if (deletedSubscription.index != subscriptionIndices.length - 1) {
+      bytes memory lastSubscriptionID = subscriptionIndices[subscriberIndices.length - 1];
+      subscriptionIndices[deletedSubscription.index] = lastSubscriptionID;
+      subscriptions[lastSubscriptionID].index = deletedSubscription.index;
+    }
+
+    Owner storage owner = owners[deletedSubscription.ownerAddress];
+
+    if (deletedSubscription.ownerSubscriptionIndex != owner.subscriptionIDs.length - 1) {
+      bytes memory lastOwnerSubID = owner.subscriptionIDs[owner.subscriptionIDs.length - 1];
+      owner.subscriptionIDs[deletedSubscription.ownerSubscriptionIndex] = lastOwnerSubID;
+      subscriptions[lastOwnerSubID].ownerSubscriptionIndex = deletedSubscription.ownerSubscriptionIndex;
+    }
+
+    Subscriber storage subscriber = subscribers[deletedSubscription.subscriberAddress];
+
+    if (deletedSubscription.subscriberSubscriptionIndex != subscriber.subscriptionIDs.length - 1) {
+      bytes memory lastSubscriberSubID = subscriber.subscriptionIDs[subscriber.subscriptionIDs.length - 1];
+      subscriber.subscriptionIDs[deletedSubscription.subscriberSubscriptionIndex] = lastSubscriberSubID;
+      subscriptions[lastSubscriberSubID].subscriberSubscriptionIndex = deletedSubscription.subscriberSubscriptionIndex;
+    }
+
+    delete subscriptions[subscriptionID];
+    subscriptionIndices.pop();
+    owner.subscriptionIDs.pop();
+    subscriber.subscriptionIDs.pop();
+
+    emit SubscriptionRemoved(
+      subscriptionID,
+      deletedSubscription.uuid,
+      deletedSubscription.ownerAddress,
+      deletedSubscription.subscriberAddress,
+      deletedSubscription.tokenAddress
+    );
+
+    return true;
+  }
+
+  function internalRemoveSubscription(bytes calldata subscriptionID) internal returns (bool) {
+    require(subscriptions[subscriptionID].exists);
+
+    Subscription memory deletedSubscription = subscriptions[subscriptionID];
 
     if (deletedSubscription.index != subscriptionIndices.length - 1) {
       bytes memory lastSubscriptionID = subscriptionIndices[subscriberIndices.length - 1];
@@ -268,7 +311,7 @@ contract SubscriptionContract {
       );
       return true;
     } else {
-      this.removeSubscription(subscriptionID);
+      internalRemoveSubscription(subscriptionID);
       emit SettlementFailure(
         subscriptionID,
         subscription.uuid,
